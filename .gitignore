@@ -1,0 +1,7 @@
+elasticsearch
+kibana
+node-2
+
+*.http
+.DS_Store
+ElasticSearch local Install

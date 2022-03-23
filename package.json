@@ -1,0 +1,21 @@
+{
+  "name": "complete-guide-to-elasticsearch",
+  "version": "1.0.0",
+  "description": "[Learn Elasticsearch from scratch and begin learning the ELK stack (Elasticsearch, Logstash & Kibana) and Elastic Stack.](https://www.udemy.com/course/elasticsearch-complete-guide/learn/lecture/7373340#overview)",
+  "main": "index.js",
+  "scripts": {
+    "elasticSearch": "elasticsearch/bin/elasticsearch",
+    "kebana": "kibana/bin/kibana"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/royeradames/complete-guide-to-elasticsearch.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/royeradames/complete-guide-to-elasticsearch/issues"
+  },
+  "homepage": "https://github.com/royeradames/complete-guide-to-elasticsearch#readme"
+}
