@@ -67,6 +67,24 @@
     - [Example](#example-2)
 - [Updating existing mappings](#updating-existing-mappings)
   - [Limitations for updating mappins](#limitations-for-updating-mappins)
+- [Reindexing documents with the Reindex API](#reindexing-documents-with-the-reindex-api)
+  - [Create new index base on the old index](#create-new-index-base-on-the-old-index)
+    - [Get the old index](#get-the-old-index)
+    - [Copy pase the structure to the new index and update any desire fields](#copy-pase-the-structure-to-the-new-index-and-update-any-desire-fields)
+    - [Reindexing](#reindexing)
+  - [_source data types](#_source-data-types)
+    - [Create new index with update field type and _source data](#create-new-index-with-update-field-type-and-_source-data)
+    - [See index changes](#see-index-changes)
+  - [Reindex documents matching a query](#reindex-documents-matching-a-query)
+    - [For whole index](#for-whole-index)
+    - [Partial Index](#partial-index)
+  - [Removing fields](#removing-fields)
+    - [Source filtering](#source-filtering)
+  - [Changing a field's name](#changing-a-fields-name)
+  - [Ignore reviews with ratings below 4.0 (specify the operation for the document within the script)](#ignore-reviews-with-ratings-below-40-specify-the-operation-for-the-document-within-the-script)
+    - [Using ctx.op within scripts](#using-ctxop-within-scripts)
+  - [Parameters for the Reindex API](#parameters-for-the-reindex-api)
+  - [Batching and throttling](#batching-and-throttling)
 
 # Introduction to analysis
 
@@ -1327,4 +1345,418 @@ PUT reviews/_mapping
 - The update by query API can be used to reclaim disk space
 - The solution is to reindex documents into a new index (sorry)
 
+# Reindexing documents with the Reindex API
 
+## Create new index base on the old index
+
+### Get the old index
+
+`GET reviews/_mapping`
+
+```JSON
+{
+  "reviews" : {
+    "mappings" : {
+      "properties" : {
+        "author" : {
+          "properties" : {
+            "email" : {
+              "type" : "keyword",
+              "ignore_above" : 256
+            },
+            "first_name" : {
+              "type" : "text"
+            },
+            "last_name" : {
+              "type" : "text"
+            }
+          }
+        },
+        "content" : {
+          "type" : "text"
+        },
+        "created_at" : {
+          "type" : "date"
+        },
+        "product_id" : {
+          "type" : "integer"
+        },
+        "rating" : {
+          "type" : "float"
+        }
+      }
+    }
+  }
+}
+```
+
+### Copy pase the structure to the new index and update any desire fields
+
+```JSON
+PUT reviews_new
+{
+  "mappings" : {
+    "properties" : {
+      "author" : {
+        "properties" : {
+          "email" : {
+            "type" : "keyword",
+            "ignore_above" : 256
+          },
+          "first_name" : {
+            "type" : "text"
+          },
+          "last_name" : {
+            "type" : "text"
+          }
+        }
+      },
+      "content" : {
+        "type" : "text"
+      },
+      "created_at" : {
+        "type" : "date"
+      },
+      "product_id" : {
+        "type" : "keyword"
+      },
+      "rating" : {
+        "type" : "float"
+      }
+    }
+  }
+}
+```
+
+```JSON
+{
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "reviews_new"
+}
+```
+
+### Reindexing
+
+![reindex-api](pictures/mapping-and-analysis/reindex-api.png)
+
+```JSON
+POST _reindex
+{
+  "source": {
+    "index": "reviews"
+  },
+  "dest": {
+    "index": "reviews_new"
+  }
+}
+```
+
+```JSON
+{
+  "took" : 50,
+  "timed_out" : false,
+  "total" : 5,
+  "updated" : 0,
+  "created" : 5,
+  "deleted" : 0,
+  "batches" : 1,
+  "version_conflicts" : 0,
+  "noops" : 0,
+  "retries" : {
+    "bulk" : 0,
+    "search" : 0
+  },
+  "throttled_millis" : 0,
+  "requests_per_second" : -1.0,
+  "throttled_until_millis" : 0,
+  "failures" : [ ]
+}
+```
+
+`GET reviews_new/_search`
+
+```JSON
+{
+  "took" : 0,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 1,
+    "successful" : 1,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 5,
+      "relation" : "eq"
+    },
+    "max_score" : 1.0,
+    "hits" : [
+      {
+        "_index" : "reviews_new",
+        "_id" : "1",
+        "_score" : 1.0,
+        "_source" : {
+          "rating" : 5.0,
+          "content" : "Outstanding course! Bo really taught me a lot about Elasticsearch!",
+          "product_id" : 123,
+          "author" : {
+            "first_name" : "John",
+            "last_name" : "Doe",
+            "email" : "johndoe123@example.com"
+          }
+        }
+      },
+      ...
+    ]
+  }
+}
+```
+
+Product_id is not text is still number. Coercion could make it a text in the inverted index but not in the _source.
+
+## _source data types
+
+- the data type doesn't reflect how the values are indexed
+- _source contains the field values supplied at index time
+- **It's common to use _source values from search results**
+  - You would probably expect a **string for a keyword** field
+- **We can modify the _source values from search results**
+  - We can modify the _source value while reindexing
+  - Alternatively this can be handled at the application level
+
+### Create new index with update field type and _source data
+
+```JSON
+# If we left out this check, we would get a NullPointerException for that document.
+POST _reindex
+{
+  "source": {
+    "index": "reviews"
+  },
+  "dest": {
+    "index": "reviews_new"
+  },
+  "script": {
+    "source": """ 
+      if (ctx._source.product_id != null) {
+        ctx._source.product_id = ctx._source.product_id.toString();
+      }
+     """
+  }
+}
+```
+
+```JSON
+{
+  "took" : 52,
+  "timed_out" : false,
+  "total" : 5,
+  "updated" : 0,
+  "created" : 5,
+  "deleted" : 0,
+  "batches" : 1,
+  "version_conflicts" : 0,
+  "noops" : 0,
+  "retries" : {
+    "bulk" : 0,
+    "search" : 0
+  },
+  "throttled_millis" : 0,
+  "requests_per_second" : -1.0,
+  "throttled_until_millis" : 0,
+  "failures" : [ ]
+}
+```
+
+### See index changes
+
+`GET reviews_new/_search`
+
+```JSON
+{
+  "took" : 1,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 1,
+    "successful" : 1,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 5,
+      "relation" : "eq"
+    },
+    "max_score" : 1.0,
+    "hits" : [
+      {
+        "_index" : "reviews_new",
+        "_id" : "1",
+        "_score" : 1.0,
+        "_source" : {
+          "rating" : 5.0,
+          "content" : "Outstanding course! Bo really taught me a lot about Elasticsearch!",
+          "product_id" : "123",
+          "author" : {
+            "first_name" : "John",
+            "last_name" : "Doe",
+            "email" : "johndoe123@example.com"
+          }
+        }
+      },
+      ...
+    ]
+  }
+}
+```
+
+Now product_id is a text in the source field.
+
+## Reindex documents matching a query
+
+### For whole index
+
+```JSON
+POST _reindex
+{
+  "source": {
+    "index": "reviews",
+    "query": {
+      "match_all": { }
+    }
+  },
+  "dest": {
+    "index": "reviews_new"
+  }
+}
+```
+
+### Partial Index
+
+```JSON
+POST _reindex
+{
+  "source": {
+    "index": "reviews",
+    "query": {
+      "range": {
+        "rating": {
+          "gte": 4.0
+        }
+      }
+    }
+  },
+  "dest": {
+    "index": "reviews_new"
+  }
+}
+```
+
+## Removing fields
+
+- Field mappings cannot be deleted
+- Fields can be left out when indexing documents
+- Maybe we want to reclaim disk space used by a field
+  - Already indexed values still take up disk space
+  - For large data sets, this may be worthwhile
+    - Assuming that we no longer need the values
+
+### Source filtering
+
+By specifying an array of field names, only those fields are included for each document when they are indexed into the destination index. In other words, any fields that you leave out will not be reindexed. It’s possible to do the same thing with a script, but using the “_source” parameter is a simpler approach.
+
+```JSON
+POST _reindex
+{
+  "source": {
+    "index": "reviews",
+    "_source": ["content", "created_at", "rating"]
+  },
+  "dest": {
+    "index": "reviews_new
+  }
+}
+```
+
+## Changing a field's name
+
+```JSON
+POST _reindex
+{
+  "source": {
+    "index": "reviews"
+  },
+  "dest": {
+    "index": "reviews_new"
+  },
+  "script": {
+    "source": """
+      # Rename "content" field to "comment"
+      ctx._source.comment = ctx._source.remove("content");
+    """
+  }
+}
+```
+
+Note:  the “_source” key translates to a Java HashMap.
+
+Besides removing a key, the “remove” method also returns its value, which is why the assignment.
+
+## Ignore reviews with ratings below 4.0 (specify the operation for the document within the script)
+
+Just as with scripted updates, it’s possible to specify the operation for the document within the script. That’s done by assigning a value to the “op” property on the “ctx” variable. You can assign a value of either “noop” or “delete.”
+
+- In the case of “noop,”
+  - the document will not be indexed into the destination index.
+
+This is useful if you have some advanced logic to determine whether or not you need to reindex documents.
+
+```JSON
+POST _reindex
+{
+  "source": {
+    "index": "reviews"
+  },
+  "dest": {
+    "index": "reviews_new"
+  },
+  "script": {
+    "source": """
+      if (ctx._source.rating < 4.0) {
+        ctx.op = "noop"; # Can also be set to "delete"
+      }
+    """
+  }
+}
+```
+
+In this example we only reindex reviews with a rating of at least 4.0.
+
+### Using ctx.op within scripts
+
+- Usually, using the query parameter is possible
+- For more advanced use cases, ctx.op can be used
+- Using the query parameter is better performance wise and is preferred
+- Specifying "delete" deletes the document within the destination index
+  - The destination index might not be empty as in our example
+  - The same cna ofter be done with the Delete by Query API
+
+## Parameters for the Reindex API
+
+- More parameters are available than the ones we coverd
+  - E.g. for **handling version conflicts**
+- A snapshot is created before reindexing documents
+- A version conflict causes the query to be aborted by default
+- The destination index is not necessarily empty
+
+## Batching and throttling
+
+- The Reindex API performs operations in batches
+  - Just like the update by query and delete by query APIs
+  - It uses the scroll api internally
+  - This is how millions of documents can be reindexed efficiently
+- Throttling can be configured to limit the performance impact
+  - Useful for production clusters
+- [Check the documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-reindex.html) if need to reindex lots of documents
