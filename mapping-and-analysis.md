@@ -54,6 +54,18 @@
 - [How missing fields are handled](#how-missing-fields-are-handled)
 - [Overview of mapping parameters](#overview-of-mapping-parameters)
   - [format parameter](#format-parameter)
+  - [Properties parameter](#properties-parameter)
+  - [coerce parameter](#coerce-parameter)
+  - [Introduction to doc_values](#introduction-to-doc_values)
+    - [Disabling odc_values](#disabling-odc_values)
+  - [norms parameter](#norms-parameter)
+    - [Example](#example)
+  - [index parameter](#index-parameter)
+    - [Example](#example-1)
+  - [null_value parameter](#null_value-parameter)
+  - [copy_to parameter](#copy_to-parameter)
+    - [Example](#example-2)
+- [Updating existing mappings](#updating-existing-mappings)
 
 # Introduction to analysis
 
@@ -846,9 +858,9 @@ PUT reviews/_mapping
 ## Default behavior of date fields
 
 - Three suppported formats
-  -   A date without time
-  -   A date with time
-  -   Milliseconds since the ephoch (long)
+  - A date without time
+  - A date with time
+  - Milliseconds since the ephoch (long)
 - UTC timezone assumed if none is specified
 - Dates must be formatted according to the ISO 8601 specification
 
@@ -868,10 +880,10 @@ If only the date is provided the time will be assume to be midnight.
 
 ## UNIX time and epoch time
 
-Although UNIX time and epoch time are often used synonymously, they mean different things. Literally speaking, 
+Although UNIX time and epoch time are often used synonymously, they mean different things. Literally speaking,
 
-- the epoch represents UNIX time 0 (midnight at the start of 1 January 1970). UNIX time, or 
-- the UNIX timestamp, refers to the number of seconds that have elapsed since the epoch. 
+- the epoch represents UNIX time 0 (midnight at the start of 1 January 1970). UNIX time, or
+- the UNIX timestamp, refers to the number of seconds that have elapsed since the epoch.
 
 The last option is to specify a long number representing the number of milliseconds since the epoch. It’s really important that you don’t specify a UNIX timestamp here, i.e. the number of seconds since the epoch. If you do that, Elasticsearch won’t give you an error because it will just treat the number as the number of milliseconds since the epoch.
 
@@ -1089,3 +1101,157 @@ GET reviews/_search
   - E.g. "epoch_second"
 
 Logstash would reformat data
+
+![format parameters](pictures/mapping-and-analysis/format-parameter.png)
+
+## Properties parameter
+
+Defines nested fields for object and nested fields
+
+![properties-parameter](pictures/mapping-and-analysis/properties-parameter.png)
+
+## coerce parameter
+
+Used to enable or disable coercion of values (enabled by default)
+
+![coerce parameter](pictures/mapping-and-analysis/coerce-parameter.png)
+
+**Disable coercion at the index level**
+
+## Introduction to doc_values
+
+- Elasticsearch makes use of several daa structures
+  - No single data astructure serves all purposes
+- Inverted indices are excellent for searching text
+  - They don't perform well for many other data access patterns
+- "Doc values" is another data structure used by Apache Lucene
+  - Optimized for a different data access pattern (document => terms)
+- Essentially an **"uninverted" inverted index**
+- **Used for sorting, aggregations, and scripting**
+- Elasticsearch automatically queries the appropriate data structure
+
+### Disabling odc_values
+
+Advance
+
+- Set the doc_values parameter to false to save disk space
+- Only disable doc values if you won't use aggregations, sorting, or scripting
+- Particularly for large indices; typically not worth it for small ones
+- **Cannot be changed without reindexing documents into new index**
+  - Use with caution, and try to anticipate how fields will be queried
+
+![disable doc_values](pictures/mapping-and-analysis/disable-doc_values.png)
+
+## norms parameter
+
+- Normalization factors used for relevance scoring
+- Often we don't just want to filter results, but also rank them
+- Norms can be disabled to save disk space
+  - Useful for fields that won't be used for relevance scoring
+  - The fields can still be used for filtering and aggregations
+
+### Example
+
+```JSON
+PUT products
+{
+  "mappings": {
+    "properties" {
+      "tags": {
+        "type": "text",
+        "norms": false
+      }
+    }
+  }
+}
+```
+
+## index parameter
+
+- Disables indexing for a field
+- Values are still stored within _source
+- Useful if you won't use a field for search queries
+- Saves disk space and slightly improves indexing throughput
+- Ofter used for time series data
+- Fields with indexing disabled can still be used for aggregations
+
+### Example
+
+```JSON
+PUT server-metrics
+{
+  "mappings": {
+    "properties": {
+      "server_id": {
+        "type": "integer",
+        "index": false
+      }
+    }
+  }
+}
+```
+
+## null_value parameter
+
+- NUll values cannot be indexed or searched
+- Use this parameter to replace NULL values with another value
+- Only works for explicit NULL values
+- THe replacement value must be of the same data type as the field
+- Does not affect the value stored within _source
+
+```JSON
+PUT sales
+{
+  "mappings": {
+    "properties": {
+      "partner_id": {
+        "type": "keyword",
+        "null_value": "NULL"
+      }
+    }
+  }
+}
+```
+
+## copy_to parameter
+
+- Used to copy multiple field values into a "group field"
+- Simply specify the name of the target field as the value
+- E.g. first_name and last_name => full_name
+- Values are copied, not terms/tokens
+  - The analyzer of the target field is used for the values
+- The target field is not part of _source
+
+### Example
+
+```JSON
+PUT sales
+{
+  "mappings": {
+    "properties": {
+      "first_name": {
+        "type": "text",
+        "copy_to": "full_name"
+      },
+      "last_name": {
+        "type": "text",
+        "copy_to": "full_name"
+      },
+      "full_name": {
+        "type": "text"
+      }
+    }
+  }
+}
+```
+
+```JSON
+POST sales/_doc
+{
+  "first_name": "John",
+  "last_name": "Doe"
+}
+```
+
+# Updating existing mappings
+
