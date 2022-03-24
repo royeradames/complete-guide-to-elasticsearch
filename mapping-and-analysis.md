@@ -66,6 +66,7 @@
   - [copy_to parameter](#copy_to-parameter)
     - [Example](#example-2)
 - [Updating existing mappings](#updating-existing-mappings)
+  - [Limitations for updating mappins](#limitations-for-updating-mappins)
 
 # Introduction to analysis
 
@@ -1254,4 +1255,76 @@ POST sales/_doc
 ```
 
 # Updating existing mappings
+
+- supppose that product IDs may now include letters
+- We need to change the product_id field's data type to eather text or keyword
+  - We won't use the field for full-text searches
+  - We will use it for filtering, so the keyword data type is ideal
+
+## Limitations for updating mappins
+
+- Generally, Elasticseaerch field mappings **cannot be changed**
+
+```JSON
+PUT /reviews/_mapping
+{
+  "properties": {
+    "product_id": {
+      "type":"keyword"
+    }
+  }
+}
+```
+
+```JSON
+{
+  "error" : {
+    "root_cause" : [
+      {
+        "type" : "illegal_argument_exception",
+        "reason" : "mapper [product_id] cannot be changed from type [integer] to [keyword]"
+      }
+    ],
+    "type" : "illegal_argument_exception",
+    "reason" : "mapper [product_id] cannot be changed from type [integer] to [keyword]"
+  },
+  "status" : 400
+}
+```
+
+- We can add new field mappings, but that's about it
+
+```JSON
+PUT reviews/_mapping
+{
+  "properties": {
+    "author": {
+      "properties": {
+        "email": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    }
+  }
+}
+```
+
+```JSON
+{
+  "acknowledged" : true
+}
+```
+
+- A few mapping parameters can be updated for existing mappings
+  - `"ignore_above": 256`
+- Being able to update mappings would be problematic for existing documents
+  - Text values have already been analyzed, for instance
+  - Changing between some data types would require rebuilding the whole data structure
+- Even for an empty index, we cannot update a mapping
+- Field mappings also cannot be removed
+  - Just leave out the field when indexing documents
+- The update by query API can be used to reclaim disk space
+- The solution is to reindex documents into a new index (sorry)
+
 
