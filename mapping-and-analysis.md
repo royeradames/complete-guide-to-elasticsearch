@@ -110,6 +110,17 @@
     - [integer](#integer)
     - [object](#object-1)
 - [💎 combining explicit and dynamic mapping](#-combining-explicit-and-dynamic-mapping)
+- [Configuring dynamic mapping](#configuring-dynamic-mapping)
+  - [syntax](#syntax-1)
+  - [Setting dynamic to false](#setting-dynamic-to-false)
+  - [only allow explicitly mapping fields](#only-allow-explicitly-mapping-fields)
+    - [syntax](#syntax-2)
+    - [Error when adding a doc with a field that doesn't exist](#error-when-adding-a-doc-with-a-field-that-doesnt-exist)
+    - [Inheritance explance](#inheritance-explance)
+  - [Numeric detection](#numeric-detection)
+  - [Default date detection formats](#default-date-detection-formats)
+    - [Disabling date detection](#disabling-date-detection)
+    - [Configuring date detection formats](#configuring-date-detection-formats)
 
 # Introduction to analysis
 
@@ -2290,3 +2301,195 @@ GET people/_mapping
 
 clean up: `DELETE people`
 
+# Configuring dynamic mapping
+
+## syntax
+
+```JSON
+PUT people
+{
+  "mappings": {
+    "dynamic": false,
+    "properties": {
+      "first_name": {
+        "type": "text"
+      }
+    }
+  }
+}
+
+POST people/_doc
+{
+  "first_name": "Bo",
+  "last_name": "andersen"
+}
+
+GET people/_mapping
+
+# first name is found
+GET people/_search
+{
+  "query": {
+    "match": {
+      "first_name": "Bo"
+    }
+  }
+}
+
+# last name not found
+GET people/_search
+{
+  "query": {
+    "match": {
+      "last_name": "andersen"
+    }
+  }
+}
+```
+
+```JSON
+
+```
+
+```JSON
+{
+  "took" : 0,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 1,
+    "successful" : 1,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 1,
+      "relation" : "eq"
+    },
+    "max_score" : 1.0,
+    "hits" : [
+      {
+        "_index" : "people",
+        "_id" : "efcjyH8BoPCPpHRmdvyR",
+        "_score" : 1.0,
+        "_source" : {
+          "first_name" : "Bo",
+          "last_name" : "andersen"
+        }
+      }
+    ]
+  }
+}
+```
+## Setting dynamic to false
+
+- **New fields are ignored**
+  - They are not indexed, but still part of _source
+- No inverted index is created for the last_name field
+  - Querying the field gives no results
+- Fields cannot be indexed without a mapping
+  - When enable, dynamic mapping creates one before indexing values
+- New fields must be mapped explicitly
+
+## only allow explicitly mapping fields
+
+- ... **setting dynamic to "strict"**
+  - Gives us full control of the mapping
+- Elasticsearch will reject unmapped fields
+  - All fields must be mapped explicitly
+  - Similar to the behavior of relational databases
+  - Remember that strict dynamic mapping doesn’t change the fact that we can leave out fields
+
+
+### syntax
+
+```JSON
+PUT people
+{
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "first_name": {
+        "type": "text"
+      }
+    }
+  }
+}
+```
+
+### Error when adding a doc with a field that doesn't exist
+
+```JSON
+POST people/_doc
+{
+  "first_name": "Bo",
+  "last_name": "andersen"
+}
+```
+
+```JSON
+{
+  "error" : {
+    "root_cause" : [
+      {
+        "type" : "strict_dynamic_mapping_exception",
+        "reason" : "mapping set to strict, dynamic introduction of [last_name] within [_doc] is not allowed"
+      }
+    ],
+    "type" : "strict_dynamic_mapping_exception",
+    "reason" : "mapping set to strict, dynamic introduction of [last_name] within [_doc] is not allowed"
+  },
+  "status" : 400
+}
+```
+
+### Inheritance explance
+
+![inheritance](pictures/mapping-and-analysis/dynamic-strict-inheritance.png)
+
+## Numeric detection
+
+```JSON
+PUT computers
+{
+  "mappings": {
+    "numeric_detection": true
+  }
+}
+
+POST computers/_doc
+{
+  "specifications": {
+    "other": {
+      "max_ram_gb": "32", #long
+      "bluetooth": "5.2" #float
+    }
+  }
+}
+```
+
+## Default date detection formats
+
+`["strict_date_optional_time", "yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z"]`
+
+### Disabling date detection
+
+```JSON
+PUT computers
+{
+  "mappings": {
+    "date_detection": false
+  }
+}
+```
+
+### Configuring date detection formats
+
+```JSON
+PUT computers
+{
+  "mappings": {
+    "dynamic_date_formats": ["dd-MM-yyyy"]
+  }
+}
+```
