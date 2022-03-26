@@ -1877,6 +1877,8 @@ GET reviews/_search
 
 # Multi-field mappings
 
+Most commonly used for making field be search work by work (text) or exact matches(keyword).
+
 It may come as a surprise to you that a field may actually be mapped in multiple ways.
 
 For instance, a “text” field may be mapped as a “keyword” field at the same time.
