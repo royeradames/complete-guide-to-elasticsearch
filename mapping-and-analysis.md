@@ -85,6 +85,11 @@
     - [Using ctx.op within scripts](#using-ctxop-within-scripts)
   - [Parameters for the Reindex API](#parameters-for-the-reindex-api)
   - [Batching and throttling](#batching-and-throttling)
+- [Defining field aliases](#defining-field-aliases)
+  - [Adding alias](#adding-alias)
+    - [Same results for both queries](#same-results-for-both-queries)
+  - [Updating field aliases](#updating-field-aliases)
+  - [Index aliases](#index-aliases)
 
 # Introduction to analysis
 
@@ -1760,3 +1765,109 @@ In this example we only reindex reviews with a rating of at least 4.0.
 - Throttling can be configured to limit the performance impact
   - Useful for production clusters
 - [Check the documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-reindex.html) if need to reindex lots of documents
+
+# Defining field aliases
+
+Useful for when wanting to rename a field without reindexing
+
+- Field names can be changed when reindexing documents
+  - Probably not worth it for lots of documents
+- An alternative is to use field aliases
+  - Doesn't require documents to be reindexed
+  - Let's add one pointing from comment to content
+  - Aliases can be used within queries
+  - Aliases are defined with a field mapping
+
+
+## Adding alias
+
+We use a data type named “alias” and specify the aliase’s target field name within a parameter named “path.”
+
+```JSON
+PUT reviews/_mapping
+{
+  "properties": {
+    "comment": {
+      "type": "alias",
+      "path": "content"
+    }
+  }
+}
+```
+
+```JSON
+# both the normal name and the alias work 
+# alias is just a pointer(path) to a field
+GET reviews/_search
+{
+  "query": {
+    "match": {
+      "content": "outstanding"
+    }
+  }
+}
+
+GET reviews/_search
+{
+  "query": {
+    "match": {
+      "comment": "outstanding"
+    }
+  }
+}
+```
+
+### Same results for both queries
+
+```JSON
+{
+  "took" : 2,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 1,
+    "successful" : 1,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 1,
+      "relation" : "eq"
+    },
+    "max_score" : 0.9116392,
+    "hits" : [
+      {
+        "_index" : "reviews",
+        "_id" : "1",
+        "_score" : 0.9116392,
+        "_source" : {
+          "rating" : 5.0,
+          "content" : "Outstanding course! Bo really taught me a lot about Elasticsearch!",
+          "product_id" : 123,
+          "author" : {
+            "first_name" : "John",
+            "last_name" : "Doe",
+            "email" : "johndoe123@example.com"
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+## Updating field aliases
+
+- Field aliases can actually be udpated
+  - Only its target field, though
+- Simply perform a mapping update with a new path value
+- Possible because aliases don't affect indexing
+  - It's query-level construct
+
+![alias](pictures/mapping-and-analysis/alias.png)
+
+## Index aliases
+
+- Similar to field aliases, Elasticsearch also supports index aliases
+- Typically used when dealing with large data valumes
+
