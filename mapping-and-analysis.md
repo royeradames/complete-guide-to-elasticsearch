@@ -109,6 +109,7 @@
     - [string](#string)
     - [integer](#integer)
     - [object](#object-1)
+- [💎 combining explicit and dynamic mapping](#-combining-explicit-and-dynamic-mapping)
 
 # Introduction to analysis
 
@@ -2218,3 +2219,74 @@ In this case an integer would be sufficient and save us some disk space, but **E
 ![explicit-object-mapping](pictures/mapping-and-analysis/explicit-object-mapping.png)
 
 It will not use nested type.
+
+# 💎 combining explicit and dynamic mapping
+
+1. explicit define the fields you want to optimize
+
+```JSON
+PUT people
+{
+  "mappings": {
+    "properties": {
+      "first_name": {
+        "type": "text"
+      }
+    }
+  }
+}
+
+GET people/_mapping
+```
+
+```JSON
+{
+  "people" : {
+    "mappings" : {
+      "properties" : {
+        "first_name" : {
+          "type" : "text"
+        }
+      }
+    }
+  }
+}
+```
+
+2. Let elesticsearch define the rest of the field when inserting a doc.
+
+```JSON
+POST people/_doc
+{
+  "first_name": "Bo",
+  "last_name": "Andersen"
+}
+
+GET people/_mapping
+```
+
+```JSON
+{
+  "people" : {
+    "mappings" : {
+      "properties" : {
+        "first_name" : {
+          "type" : "text"
+        },
+        "last_name" : {
+          "type" : "text",
+          "fields" : {
+            "keyword" : {
+              "type" : "keyword",
+              "ignore_above" : 256
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+clean up: `DELETE people`
+
