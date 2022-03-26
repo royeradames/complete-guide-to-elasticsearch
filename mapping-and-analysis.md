@@ -94,6 +94,16 @@
   - [Create multi fields](#create-multi-fields)
   - [What happens in the background](#what-happens-in-the-background)
   - [searching multi fields](#searching-multi-fields)
+- [Index templates](#index-templates)
+- [Syntax](#syntax)
+    - [If you still pass mapping values then it will overwrite the templates](#if-you-still-pass-mapping-values-then-it-will-overwrite-the-templates)
+  - [Prioerties of index templates](#prioerties-of-index-templates)
+  - [Updating an index template](#updating-an-index-template)
+  - [Retrieving an index template](#retrieving-an-index-template)
+  - [Deleting an index template](#deleting-an-index-template)
+- [Introduction to the Elastic COmmon Schema (ECS)](#introduction-to-the-elastic-common-schema-ecs)
+  - [What is ECS?](#what-is-ecs)
+  - [Uses of ECS](#uses-of-ecs)
 
 # Introduction to analysis
 
@@ -1782,7 +1792,6 @@ Useful for when wanting to rename a field without reindexing
   - Aliases can be used within queries
   - Aliases are defined with a field mapping
 
-
 ## Adding alias
 
 We use a data type named “alias” and specify the aliase’s target field name within a parameter named “path.”
@@ -1952,6 +1961,7 @@ GET multi_field_test/_search
 ```
 
 Results
+
 ```JSON
 {
   "took" : 0,
@@ -1989,3 +1999,177 @@ Results
 
 Index not needed anymore
 `DELETE multi_field_test`
+
+# Index templates
+
+- Index templates specify settings and mappings
+- they are applied to indices that match one or more patterns
+- Patterns may include wildcards(*)
+- Index templates take effect when creating new indices
+
+# Syntax
+
+```JSON
+# have a general properties and types for an index that match a specific name
+# Path is PUT _template/<index name>
+PUT _template/access-logs
+{
+  "index_patterns": ["access-logs-*"], 
+  "settings": {
+    "number_of_shards": 2,
+    "index.mapping.coerce": false
+  },
+  "mappings":{
+    "properties":{
+      "@timestamp":{
+        "type": "date"
+      },
+      "url.original": {
+        "type": "keyword"
+      },
+      "http.request.referrer": {
+        "type": "keyword"
+      },
+      "http.response.status_code": {
+        "type": "long"
+      }
+    }
+  }
+}
+```
+
+**Names are base on the Elastic Common Schema**
+
+![monthly-daily-indices](pictures/mapping-and-analysis/monthly-daily-indices.png)
+
+```JSON
+# create new index with the template
+# if you still pass mapping values then it will overwrite the templates
+PUT access-logs-2020-01-1
+
+GET access-logs-2020-01-1
+```
+
+Results
+
+```JSON
+{
+  "access-logs-2020-01-1" : {
+    "aliases" : { },
+    "mappings" : {
+      "properties" : {
+        "@timestamp" : {
+          "type" : "date"
+        },
+        "http" : {
+          "properties" : {
+            "request" : {
+              "properties" : {
+                "referrer" : {
+                  "type" : "keyword"
+                }
+              }
+            },
+            "response" : {
+              "properties" : {
+                "status_code" : {
+                  "type" : "long"
+                }
+              }
+            }
+          }
+        },
+        "url" : {
+          "properties" : {
+            "original" : {
+              "type" : "keyword"
+            }
+          }
+        }
+      }
+    },
+    "settings" : {
+      "index" : {
+        "routing" : {
+          "allocation" : {
+            "include" : {
+              "_tier_preference" : "data_content"
+            }
+          }
+        },
+        "mapping" : {
+          "coerce" : "false"
+        },
+        "number_of_shards" : "2",
+        "provided_name" : "access-logs-2020-01-1",
+        "creation_date" : "1648306655668",
+        "number_of_replicas" : "1",
+        "uuid" : "Viyvm-PhQIa6ckVe52q_lw",
+        "version" : {
+          "created" : "8010099"
+        }
+      }
+    }
+  }
+}
+```
+
+### If you still pass mapping values then it will overwrite the templates
+
+![overwrite-index-template](pictures/mapping-and-analysis/overwrite-index-template.png)
+
+## Prioerties of index templates
+
+- a new index may match multiple index templates
+- An order parameter can be used to define the priority if index templates
+  - The value is simply an integer
+  - Templates with lower values are merged first
+
+## Updating an index template
+
+Doesn't affect old indexes
+
+```JSON
+PUT _template/access-logs
+{
+  # Full configuration
+}
+```
+
+## Retrieving an index template
+
+`GET _template/access-logs`
+
+## Deleting an index template
+
+`DELETE _template/access-logs`
+
+# Introduction to the Elastic COmmon Schema (ECS)
+
+The main point of this section is to be aware of ECS
+
+## What is ECS?
+
+- A specification of common fields and how they should be mapped
+- Before ECS, there was no cohesion between field names
+- Ingesting logs from nginx
+- Before ECS not standard names
+![no-standard-names](pictures/mapping-and-analysis/no-standard-names.png)
+  - Data comes from different data sources
+![collect-data-from-different-services](pictures/mapping-and-analysis/collect-data-from-different-services.png)
+
+- ECS means that common fields are named the same thing
+  - E.g. @timestamp
+- Use-case independent
+- Groups of fields are referred to as field sets
+- [Documentations on ECS](https://www.elastic.co/guide/en/ecs/current/ecs-reference.html)
+
+## Uses of ECS
+
+- In ECS, documents are referred to as events
+  - ECS doesn't provide fields for non-events (e.g. products)
+- Mostly useful for standard events
+  - E.g. web server logs, operating system metrics, etc.
+- ECS is automatically handled by Elastic Stack products
+  - If you use them, you often won't have to actively deal with ECS
+- **You might not need to use ECS, but it's good to know what it is**
