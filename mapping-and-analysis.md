@@ -104,6 +104,11 @@
 - [Introduction to the Elastic COmmon Schema (ECS)](#introduction-to-the-elastic-common-schema-ecs)
   - [What is ECS?](#what-is-ecs)
   - [Uses of ECS](#uses-of-ecs)
+- [Introduction to dynamic mapping](#introduction-to-dynamic-mapping)
+  - [Rules](#rules)
+    - [string](#string)
+    - [integer](#integer)
+    - [object](#object-1)
 
 # Introduction to analysis
 
@@ -2173,3 +2178,43 @@ The main point of this section is to be aware of ECS
 - ECS is automatically handled by Elastic Stack products
   - If you use them, you often won't have to actively deal with ECS
 - **You might not need to use ECS, but it's good to know what it is**
+
+# Introduction to dynamic mapping
+
+When you add a doc to an index without mapping it auto generate the mapping base on the doc.
+
+**Not the most efficient way**. String and integer can be easily optimize if done implicitly.
+
+![dynamic-mapping](pictures/mapping-and-analysis/dynamic-mapping.png)
+
+## Rules 
+
+**Don't relay on coercion**
+
+![dynamic-mapping-rules](pictures/mapping-and-analysis/dynamic-mapping-rules.png)
+
+### string
+
+**Mapped to a “text” field which has a nested “keyword” mapping.** 
+
+There are two exceptions to this: 
+1. if the value passes date detection. By default, values are checked against the date formats that you see on your screen now, but this can be configured. 
+2. Perhaps you noticed how the table shows that strings can also be mapped to “float” or “long” fields. **Done with coercion.**
+  
+- This is done with numeric detection, which is essentially coercion. If a string contains only a number, numeric detection will map the field as either “float” or “long,” depending on the value. This behavior is actually disabled by default, hence why I have listed the data types in parenthesis. You can enable it if you want to, but that’s not the best practice. 
+
+- Instead, you can map numeric fields explicitly, and if numbers are sent to Elasticsearch as strings, coercion will take care of the rest.
+
+- Even better, **you should ensure that numbers are always sent to Elasticsearch as numbers instead of strings**. Numeric detection and coercion are essentially ways for Elasticsearch to be forgiving, but you should try to not rely on them.
+
+### integer
+
+Default: long.
+
+In this case an integer would be sufficient and save us some disk space, but **Elasticsearch cannot know how large numbers we intend to store for a field**, so it always chooses the “long” data type. **When storing millions of documents, it might be worth explicitly mapping the field as an integer instead**.
+
+### object
+
+![explicit-object-mapping](pictures/mapping-and-analysis/explicit-object-mapping.png)
+
+It will not use nested type.
