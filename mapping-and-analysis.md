@@ -90,6 +90,10 @@
     - [Same results for both queries](#same-results-for-both-queries)
   - [Updating field aliases](#updating-field-aliases)
   - [Index aliases](#index-aliases)
+- [Multi-field mappings](#multi-field-mappings)
+  - [Create multi fields](#create-multi-fields)
+  - [What happens in the background](#what-happens-in-the-background)
+  - [searching multi fields](#searching-multi-fields)
 
 # Introduction to analysis
 
@@ -1871,3 +1875,115 @@ GET reviews/_search
 - Similar to field aliases, Elasticsearch also supports index aliases
 - Typically used when dealing with large data valumes
 
+# Multi-field mappings
+
+It may come as a surprise to you that a field may actually be mapped in multiple ways.
+
+For instance, a “text” field may be mapped as a “keyword” field at the same time.
+
+## Create multi fields
+
+```JSON
+# Create multi fields for ingredients
+PUT multi_field_test
+{
+  "mappings": {
+    "properties": {
+      "description": {
+        "type": "text"
+      },
+      "ingredients": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  }
+}
+
+#Populate field
+POST multi_field_test/_doc
+{
+  "description": "To make this spaghetti carbonara, you first need to...",
+  "ingredients": ["Spagetti", "Bacon", "Eggs"]
+}
+```
+
+## What happens in the background
+
+You get two inverted index
+
+![milti-field-mapping](pictures/mapping-and-analysis/multi-flield-mapping.png)
+
+## searching multi fields
+
+```JSON
+# searching the fields
+GET multi_field_test/_search
+{
+  "query": {
+    "match_all": {}
+  }
+}
+
+GET multi_field_test/_search
+{
+  "query": {
+    "match": {
+      "ingredients": "Spagetti"
+    }
+  }
+}
+
+GET multi_field_test/_search
+{
+  "query":{
+    "term": {
+      "ingredients.keyword": "Spaghetti"
+    }
+  }
+}
+
+```
+
+Results
+```JSON
+{
+  "took" : 0,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 1,
+    "successful" : 1,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 1,
+      "relation" : "eq"
+    },
+    "max_score" : 0.9530773,
+    "hits" : [
+      {
+        "_index" : "multi_field_test",
+        "_id" : "dfelxn8BoPCPpHRmqfzk",
+        "_score" : 0.9530773,
+        "_source" : {
+          "description" : "To make this spaghetti carbonara, you first need to...",
+          "ingredients" : [
+            "Spaghetti",
+            "Bacon",
+            "Eggs"
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+Index not needed anymore
+`DELETE multi_field_test`
