@@ -136,6 +136,11 @@
     - [syntax example](#syntax-example)
     - [dynamic_type](#dynamic_type)
   - [Index templates vs dynamic templates](#index-templates-vs-dynamic-templates)
+- [**Mapping recommendations**](#mapping-recommendations)
+  - [Mapping of text fields](#mapping-of-text-fields)
+  - [**Disable coercion**if you have full control of the application that is sending data to Elasticsearch](#disable-coercionif-you-have-full-control-of-the-application-that-is-sending-data-to-elasticsearch)
+  - [Use appropriate numeric data types](#use-appropriate-numeric-data-types)
+  - [Mapping parameters](#mapping-parameters)
 
 # Introduction to analysis
 
@@ -2214,7 +2219,7 @@ When you add a doc to an index without mapping it auto generate the mapping base
 
 ![dynamic-mapping](pictures/mapping-and-analysis/dynamic-mapping.png)
 
-## Rules 
+## Rules
 
 **Don't relay on coercion**
 
@@ -2222,13 +2227,14 @@ When you add a doc to an index without mapping it auto generate the mapping base
 
 ### string
 
-**Mapped to a “text” field which has a nested “keyword” mapping.** 
+**Mapped to a “text” field which has a nested “keyword” mapping.**
 
-There are two exceptions to this: 
-1. if the value passes date detection. By default, values are checked against the date formats that you see on your screen now, but this can be configured. 
+There are two exceptions to this:
+
+1. if the value passes date detection. By default, values are checked against the date formats that you see on your screen now, but this can be configured.
 2. Perhaps you noticed how the table shows that strings can also be mapped to “float” or “long” fields. **Done with coercion.**
   
-- This is done with numeric detection, which is essentially coercion. If a string contains only a number, numeric detection will map the field as either “float” or “long,” depending on the value. This behavior is actually disabled by default, hence why I have listed the data types in parenthesis. You can enable it if you want to, but that’s not the best practice. 
+- This is done with numeric detection, which is essentially coercion. If a string contains only a number, numeric detection will map the field as either “float” or “long,” depending on the value. This behavior is actually disabled by default, hence why I have listed the data types in parenthesis. You can enable it if you want to, but that’s not the best practice.
 
 - Instead, you can map numeric fields explicitly, and if numbers are sent to Elasticsearch as strings, coercion will take care of the rest.
 
@@ -2396,6 +2402,7 @@ GET people/_search
   }
 }
 ```
+
 ## Setting dynamic to false
 
 - **New fields are ignored**
@@ -2414,7 +2421,6 @@ GET people/_search
   - All fields must be mapped explicitly
   - Similar to the behavior of relational databases
   - Remember that strict dynamic mapping doesn’t change the fact that we can leave out fields
-
 
 ### syntax
 
@@ -2566,6 +2572,7 @@ GET dynamic_template_test/_mapping
 ```
 
 ## match_mapping_type
+
 | Json Value     | match_mapping_type |
 | -------------- | ------------------ |
 | true or false  | boolean            |
@@ -2577,7 +2584,9 @@ GET dynamic_template_test/_mapping
 | Any            | *                  |
 
 It’s also worth noting that “double” is used for numbers with a decimal, since there is no way of distinguishing a “double” from a “float” in JSON. Likewise, we also cannot distinguish between an “integer” and a “long.” **As a result, the wider data type will always be chosen.**
+
 ## use case
+
 ### text only does text or keyword only instead of both
 
 ### increase ignore_aboce 256 => 512
@@ -2606,7 +2615,6 @@ PUT test_index
 - unmatch is used to exclude fields that were matched parameter
 - Both parameters support patterns with wildcards (*)
   - Hard coding field names wouldn't make any sense
-
 
 ### syntax
 
@@ -2644,6 +2652,7 @@ In situations where there are more than one, the templates are processed in orde
 What this template does is therefore to map string values to “text” fields — provided that the field name matches the pattern defined by the “match” parameter and doesn’t match the pattern defined by the “unmatch” parameter.
 
 #### If we add a doc
+
 ```JSON
 POST test_index/_doc
 {
@@ -2673,7 +2682,7 @@ If we need more flexibility than what the “match” parameter provides with wi
 
 ### set a parameter named “match_pattern” to “regex.”
 
-```JSON 
+```JSON
 PUT teset_index
 {
   "mappings": {
@@ -2855,3 +2864,45 @@ As you can see, both field mappings have the “index” parameter set to “fal
   - The specified field mapping is added if the template's conditions match
 - Index templates define fixed mappings; dynamic templates are... dynamic
 
+# **Mapping recommendations**
+
+- Dynamic mapping is convenient, but often not a good idea in production
+- Save disk space with optimized mappings when storing many documents
+- Set dynamic to "strict", not false
+  - Avoids surprises and unexpected results
+
+## Mapping of text fields
+
+- Don't always map strings as both text and keyword
+  - Typically only one is needed
+  - Each mapping requires disk space
+- Do you need to perform full-text searches
+  - Add a text mapping
+- Do you need to do aggregations, sorting, or filtering on exact values?
+  - Add a keyword mapping
+
+## **Disable coercion**if you have full control of the application that is sending data to Elasticsearch
+
+- Coercion forgives you for not doing the right thing
+- Try to do the right thing instead
+- Always use the correct data types whenever possible
+
+## Use appropriate numeric data types
+
+- For whole numbers, the integer data type might be enough
+  - Long can store larger numbers, but also uses more disk space
+- For decimal numbers, the float data type might be precise enough
+  - Double stores numbers with a higher precision but uses 2x disk space
+  - Usually, float provides enough precision
+
+## Mapping parameters
+
+- Set doc_values to false if you don't need sorting, aggregations, and scripting
+- Set norms to false if you don't need relevance scoring
+- Set index to false if you don't need to filter on values
+  - You can still do aggregations, e.g. for time series data
+- Probably only worth the effort when storing lots of documents
+  - Otherwise it's probably an over complication
+- Worst case scenario, you will need to reindex documents
+
+**Rule of thump: not worth it for less than 1 million docs**
