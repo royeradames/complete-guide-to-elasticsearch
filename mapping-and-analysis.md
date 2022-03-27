@@ -121,6 +121,21 @@
   - [Default date detection formats](#default-date-detection-formats)
     - [Disabling date detection](#disabling-date-detection)
     - [Configuring date detection formats](#configuring-date-detection-formats)
+- [Dynamic templates](#dynamic-templates)
+  - [syntax](#syntax-3)
+  - [match_mapping_type](#match_mapping_type)
+  - [use case](#use-case)
+    - [text only does text or keyword only instead of both](#text-only-does-text-or-keyword-only-instead-of-both)
+    - [increase ignore_aboce 256 => 512](#increase-ignore_aboce-256--512)
+  - [match and unmatch parameters (specify field names)](#match-and-unmatch-parameters-specify-field-names)
+    - [syntax](#syntax-4)
+      - [If we add a doc](#if-we-add-a-doc)
+    - [set a parameter named “match_pattern” to “regex.”](#set-a-parameter-named-match_pattern-to-regex)
+      - [Resulting dynamic mapping results](#resulting-dynamic-mapping-results)
+  - [path_match and path_unmatch parameters](#path_match-and-path_unmatch-parameters)
+    - [syntax example](#syntax-example)
+    - [dynamic_type](#dynamic_type)
+  - [Index templates vs dynamic templates](#index-templates-vs-dynamic-templates)
 
 # Introduction to analysis
 
@@ -2493,3 +2508,350 @@ PUT computers
   }
 }
 ```
+
+# Dynamic templates
+
+**changes default dynamic values**
+
+A dynamic template consists of one or more conditions along with the mapping a field should use if it matches the conditions. Dynamic templates are used when dynamic mapping is enabled and a new field is encountered without any existing mapping.
+
+## syntax
+
+```JSON
+PUT dynamic_template_test
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "integers": {
+          "match_mapping_type": "long",
+          "mapping": {
+            "type": "integer"
+          }
+        }
+      }]
+  }
+}
+
+POST dynamic_template_test/_doc
+{
+  "in_stock": 123
+}
+
+GET dynamic_template_test/_mapping
+```
+
+```JSON
+{
+  "dynamic_template_test" : {
+    "mappings" : {
+      "dynamic_templates" : [
+        {
+          "integers" : {
+            "match_mapping_type" : "long",
+            "mapping" : {
+              "type" : "integer"
+            }
+          }
+        }
+      ],
+      "properties" : {
+        "in_stock" : {
+          "type" : "integer"
+        }
+      }
+    }
+  }
+}
+```
+
+## match_mapping_type
+| Json Value     | match_mapping_type |
+| -------------- | ------------------ |
+| true or false  | boolean            |
+| {...} (object) | object             |
+| "string value" | string             |
+| "2020/01/01"   | date               |
+| 123.4          | double             |
+| 123            | long               |
+| Any            | *                  |
+
+It’s also worth noting that “double” is used for numbers with a decimal, since there is no way of distinguishing a “double” from a “float” in JSON. Likewise, we also cannot distinguish between an “integer” and a “long.” **As a result, the wider data type will always be chosen.**
+## use case
+### text only does text or keyword only instead of both
+
+### increase ignore_aboce 256 => 512
+
+```JSON
+PUT test_index
+{
+  "mappings": {
+    "dynamic_templates": [{
+      "strings": {
+        "type": "text",
+        "fields": {
+          "type": "keyword",
+          "ignore_above": 512
+        }
+      }
+    }]
+  }
+}
+```
+
+## match and unmatch parameters (specify field names)
+
+- Used to **specify** conditions for **field names**
+- Field names must match the condition specified by the match parameter
+- unmatch is used to exclude fields that were matched parameter
+- Both parameters support patterns with wildcards (*)
+  - Hard coding field names wouldn't make any sense
+
+
+### syntax
+
+```JSON
+PUT test_index
+{
+  "mappings": {
+    "dynamic_templates": [{
+      "strings_only_text": {
+        "match_mapping_type": "string",
+        "match": "text_*",
+        "unmatch": "*_keyword",
+        "mapping": {
+          "type": "text"
+        }
+      },
+      {
+        "strings_only_keyword": {
+          "match_mapping_type": "string",
+          "match": "*_keyword",
+          "mapping": {
+            "type": "keyword"
+          }
+        }
+      }
+    }]
+  }
+}
+```
+
+The first thing to notice is how this example actually includes two dynamic templates.
+
+In situations where there are more than one, the templates are processed in order, and the first matching template wins.
+
+What this template does is therefore to map string values to “text” fields — provided that the field name matches the pattern defined by the “match” parameter and doesn’t match the pattern defined by the “unmatch” parameter.
+
+#### If we add a doc
+```JSON
+POST test_index/_doc
+{
+  "text_product_description": "A description.",
+  "text_product_id_keyword": "ABC-123"
+}
+```
+
+```JSON
+{
+  "test_index": {
+    "mappings": {
+      "properties": {
+        "text_product_description": {
+          "type": "text"
+        },
+        "text_product_id_keyword": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}
+```
+
+If we need more flexibility than what the “match” parameter provides with wildcards, we can set a parameter named “match_pattern” to “regex.”
+
+### set a parameter named “match_pattern” to “regex.”
+
+```JSON 
+PUT teset_index
+{
+  "mappings": {
+    "dynamic_templates": [{
+      "names": {
+        "match_mapping_type": "string",
+        "match": "^[a-zA-Z] + _name$",
+        "match_pattern": "regex",
+        "mapping": {
+          "type": "text"
+        }
+      }
+    }]
+  }
+}
+```
+
+#### Resulting dynamic mapping results
+
+```JSON
+# adding the doc
+POST test_index/_doc
+{
+  "first_name": "John",
+  "middle_name": "Edward",
+  "last_name": "Doe"
+}
+# get the mapping
+GET test_index/_mapping
+```
+
+```JSON
+{
+  "properties": {
+    "first_name": {
+      "type": "text"
+    },
+    "last_name": {
+      "type": "text"
+    },
+    "middle_name": {
+      "type": "text"
+    }
+  }
+}
+```
+
+## path_match and path_unmatch parameters
+
+- These parameters evaluate the full field path
+  - I.e. not just the field names
+- This is the dot notation that you saw earlier
+  - E.g. name.first_name
+- Wildcards are also supported
+
+### syntax example
+
+```JSON
+PUT test_index
+{
+  "mappings": {
+    "dynamic_templates": [{
+      "copy_to_full_name": {
+        "match_mapping_type": "string",
+        "path_match": "employer.name.*",
+        "mapping": {
+          "type": "text",
+          "copy_to": "full_name"
+        }
+      }
+    }]
+  }
+}
+
+# great mapping dynamic
+POST test_index/_doc
+{
+  "employer": {
+    "name": {
+      "first_name": "John",
+
+    }
+  }
+}
+```
+
+```JSON
+{
+  "properties": {
+    "employer": {
+      "properties": {
+        "name": {
+          "properties": {
+            "first_name": {
+              "type": "text",
+              "copy_to": ["full_name"]
+            },
+            "middle_name": {
+              "type": "text",
+              "copy_to": ["full_name"]
+            },
+            "last_name": {
+              "type": "text",
+              "copy_to": ["full_name"]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### dynamic_type
+
+Within the “mapping” key of a dynamic template, the “dynamic_type” placeholder is replaced with the data type that was detected by dynamic mapping.
+
+This template matches all data types and adds a mapping of that same data type.
+
+The purpose of this template is to set the “index” parameter to “false.” The data type is going to be the same as it otherwise would be with dynamic mapping.
+
+```JSON
+PUT test_index
+{
+  "mappings": {
+    "dynamic_templates": {
+      {
+        "no_doc_values": {
+          "match_mapping_type": "*",
+          "mapping": {
+            "type": "(dynamic_type)",
+            "index": false
+          }
+        }
+      }
+    }
+  }
+}
+
+# dynamically great mapping
+POST test_index/_doc
+{
+  "name": "John Doe",
+  "age": 26
+}
+```
+
+If we didn’t have this placeholder at our disposal, we would have to add a dynamic template for each data type, which would be quite inconvenient.
+
+This particular example with disabling indexing could be used for time series data.
+
+Perhaps you recall me mentioning that this is a common optimization for time series data where you typically don’t need to filter on specific values, but rather aggregate by time intervals.
+
+Another optimization for time series data is to disable norms, which you can do in exactly the same way.
+
+```JSON
+{
+  "properties": {
+    "age": {
+      "type": "long",
+      "index": false
+    },
+    "name": {
+      "type": "text",
+      "index": false
+    }
+  }
+}
+```
+
+As you can see, both field mappings have the “index” parameter set to “false” as we expected.
+
+## Index templates vs dynamic templates
+
+- Index templates apply mappings and index settings for matching indices
+  - This happens when indices are created and their names match a pattern
+- Dynamic templates are evaluated when new fields are encountered
+  - ... and dynamic mapping is enabled
+  - The specified field mapping is added if the template's conditions match
+- Index templates define fixed mappings; dynamic templates are... dynamic
+
