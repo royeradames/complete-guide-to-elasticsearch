@@ -146,6 +146,19 @@
   - [Introduction to stop words](#introduction-to-stop-words)
     - [Example](#example-3)
 - [Analyzers and search queries](#analyzers-and-search-queries)
+- [Built-in analyzers](#built-in-analyzers)
+  - [standard analyzer](#standard-analyzer-1)
+    - [Example](#example-4)
+  - [simple analyzer](#simple-analyzer)
+    - [example](#example-5)
+  - [whitespace analyzer](#whitespace-analyzer)
+  - [keyword analyzer](#keyword-analyzer)
+  - [pattern analyzer](#pattern-analyzer)
+  - [Language Analyzers](#language-analyzers)
+    - [English example](#english-example)
+  - [How to use analyzer in field mapping](#how-to-use-analyzer-in-field-mapping)
+  - [Configuring built-in anaylzers](#configuring-built-in-anaylzers)
+    - [Using custom config](#using-custom-config)
 
 # Introduction to analysis
 
@@ -2947,3 +2960,149 @@ how values can be matched even though they differ from the ones specified within
 ![analyzers-and-search-queries](analyzers-and-search-pictures/mapping-and-analysis/analyzers-and-search-queries-2.png)
 ![analyzers-and-search-queries](analyzers-and-search-pictures/mapping-and-analysis/analyzers-and-search-queries-3.png)
 
+# Built-in analyzers
+
+[reference](https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-analyzers.html)
+## standard analyzer
+
+- Splits text at word boundaries and removes punctuation
+  - Done by the standard tokenizer
+- Lowercases letters with the lowercase token filter
+- Contains the stop token filter (disabled by default)
+  
+### Example
+
+`"Is that Peter's cute-looking dog?"` => `["is", "that", "peter's", "cute", "looking", "dog"]`
+
+## simple analyzer
+
+- Similar to the standard analyzer
+  - Splits into tokens when encourtering anything else than eltters
+- Lowercases letters with the lowercase tokenizer
+  - Unusual and a performance hack
+
+### example
+
+`"Is that Peter's cute-looking dog?"` => `["is", "that", "peter", "s", "cute", "looking", "dog"]`
+
+## whitespace analyzer
+
+- splits text into tokens by whitespace
+- Does not lowercase letters
+
+`"Is that Peter's cute-lloking dog?"` => `["Is", "that", "Peter's", "cute-looking", "dog?"]`
+
+## keyword analyzer
+
+- No-op analyzer that leaves the input text intact
+  - It simply outputs it as a single token
+- Used for keyword fields by default
+  - Used for exact matching
+
+`"Is that Peter's cute-looking dog?"` => `["Is that Peter's cute-looking dog?"]`
+
+## pattern analyzer
+
+- A regular expression is used to match token separators
+  - It should match whatever should split the text into tokens
+- This analyzer is very flexible
+- The defult pattern matches all non-word characters (\W+)
+- Lowercases letters by default
+
+`"Is that Peter's cute-looking dog?"` => `["is", "that", "peter", "s", "cute", "looking", "dog?"]`
+
+## Language Analyzers
+
+[reference](https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-lang-analyzer.html)
+
+### English example
+
+[english](https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-lang-analyzer.html#english-analyzer)
+
+```JSON
+PUT /english_example
+{
+  "settings": {
+    "analysis": {
+      "filter": {
+        "english_stop": {
+          "type":       "stop",
+          "stopwords":  "_english_" 
+        },
+        "english_keywords": {
+          "type":       "keyword_marker",
+          "keywords":   ["example"] 
+        },
+        "english_stemmer": {
+          "type":       "stemmer",
+          "language":   "english"
+        },
+        "english_possessive_stemmer": {
+          "type":       "stemmer",
+          "language":   "possessive_english"
+        }
+      },
+      "analyzer": {
+        "rebuilt_english": {
+          "tokenizer":  "standard",
+          "filter": [
+            "english_possessive_stemmer",
+            "lowercase",
+            "english_stop",
+            "english_keywords",
+            "english_stemmer"
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+## How to use analyzer in field mapping
+
+Show to how to use the `English analyzer` for description field
+
+![use-analyzer-in-field-mapping](use-pictures/mapping-and-analysis/use-analyzer-in-field-mapping.png)
+
+## Configuring built-in anaylzers
+
+```JSON
+PUT products
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "remove_english_stop_words": {
+          "type": "standard",
+          "stopwords": "_english_"
+        }
+      }
+    }
+  }
+}
+```
+
+[standard anaylyzer configuration options](https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-standard-analyzer.html#_configuration_5)
+
+### Using custom config
+
+```JSON
+PUT products/_mapping
+{
+  "properties": {
+    "description": {
+      "type": "text",
+      "analyzer": "remove_english_stop_words"
+    }
+  }
+}
+
+# add doc
+POST products/_doc
+{
+  "description": "Is that Peter's cute-looking dog?"
+}
+```
+
+`["peter's", "cute", "looking", "dog"]`
