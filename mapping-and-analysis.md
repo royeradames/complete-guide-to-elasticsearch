@@ -145,6 +145,7 @@
   - [Introduction to stemming](#introduction-to-stemming)
   - [Introduction to stop words](#introduction-to-stop-words)
     - [Example](#example-3)
+- [Analyzers and search queries](#analyzers-and-search-queries)
 
 # Introduction to analysis
 
@@ -2936,3 +2937,13 @@ Stemming reduces words to their root form
 ### Example
 
 `I loved drinking bottles of wine on last year's vacation.` => `I loved drinking bottles wine last year's vacation.`
+
+# Analyzers and search queries
+
+how values can be matched even though they differ from the ones specified within search queries?
+- By running the query text to the analyzer 
+
+![analyzers-and-search-queries](analyzers-and-search-pictures/mapping-and-analysis/analyzers-and-search-queries-1.png)
+![analyzers-and-search-queries](analyzers-and-search-pictures/mapping-and-analysis/analyzers-and-search-queries-2.png)
+![analyzers-and-search-queries](analyzers-and-search-pictures/mapping-and-analysis/analyzers-and-search-queries-3.png)
+
