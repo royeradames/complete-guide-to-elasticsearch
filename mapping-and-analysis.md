@@ -141,6 +141,10 @@
   - [**Disable coercion**if you have full control of the application that is sending data to Elasticsearch](#disable-coercionif-you-have-full-control-of-the-application-that-is-sending-data-to-elasticsearch)
   - [Use appropriate numeric data types](#use-appropriate-numeric-data-types)
   - [Mapping parameters](#mapping-parameters)
+- [Stemming & stop words](#stemming--stop-words)
+  - [Introduction to stemming](#introduction-to-stemming)
+  - [Introduction to stop words](#introduction-to-stop-words)
+    - [Example](#example-3)
 
 # Introduction to analysis
 
@@ -2906,3 +2910,29 @@ As you can see, both field mappings have the “index” parameter set to “fal
 - Worst case scenario, you will need to reindex documents
 
 **Rule of thump: not worth it for less than 1 million docs**
+
+# Stemming & stop words
+
+![steaming-and-stop-words](pictures/mapping-and-analysis/steaming-and-stop-words-case-1.png)
+![steaming-and-stop-words](pictures/mapping-and-analysis/steaming-and-stop-words-case-2.png)
+
+## Introduction to stemming
+
+Stemming reduces words to their root form
+- E.g. loved => love and drinking => drink
+
+![steaming-results](pictures/mapping-and-analysis/steaming-results.png)
+
+## Introduction to stop words
+
+- Words that are filtered out during text analysis
+  - Common words such as "a", "the", "at", "of", "on", etc.
+- They provide little to no value for relevance scoring
+- Fairly common to remove such words
+  - Less common in Elasticsearch today than in the past
+    - The relevance algorithm has been improved significanltly
+- Not removed by default, and I generally don't recommend doing so
+  
+### Example
+
+`I loved drinking bottles of wine on last year's vacation.` => `I loved drinking bottles wine last year's vacation.`
