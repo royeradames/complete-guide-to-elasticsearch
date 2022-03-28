@@ -162,6 +162,9 @@
 - [Creating custom analyzers](#creating-custom-analyzers)
   - [Creating custom analyzer](#creating-custom-analyzer)
   - [configure part of an analyzer example](#configure-part-of-an-analyzer-example)
+- [Adding analyzers to existing indices](#adding-analyzers-to-existing-indices)
+  - [Open & closed indices](#open--closed-indices)
+  - [Dynamic and static settings](#dynamic-and-static-settings)
 
 # Introduction to analysis
 
@@ -3368,3 +3371,55 @@ PUT analyer_test2
   }
 }
 ```
+
+# Adding analyzers to existing indices
+
+```JSON
+# first close the index (make it unavailable)
+POST analyzer_test/_close
+
+# add new analyzer
+PUT analyzer_test/_settings
+{
+  "analysis": {
+    "analyzer": {
+      "my_second_analyzer": {
+        "type": "custom",
+        "char_filter": ["html_strip"],
+        "tokenizer": "standard",
+        "filter": [
+          "lowercase", "stop", "asciifolding"] 
+      }
+    }
+  }
+}
+
+# open the index (make the index available)
+POST analyzer_test/_open
+```
+
+Very the analyzer is there `GET analyzer_test/_settings`
+## Open & closed indices
+
+- An open index is available for indexing and research requests
+- A closed index will be refuse requests
+  - Read and write requests are blocked
+  - Necessary for performing some operations
+
+`uses the _close and _open api`
+## Dynamic and static settings
+
+- Dynamic settings can be changed without closing the index first
+  - Requires no downtime
+- Static settings require the index to be closed first
+  - The index will be briefly unabailable
+- Analysis settings are static settings
+
+Having to close and open the index is not specific to analyzers, but more precisely to **anything related to analysis**. You therefore need to do the same thing if you want to modify character filters, tokenizers, or token filters.
+
+- Fairly quick, but might not be an option for production clusters
+  - E.g. mission critical systems where downtime is unacceptable
+- Alternatively reindex documents into a new index
+  - Create the new index with the updated settings
+  - Use an index alias for the transition
+  - 
