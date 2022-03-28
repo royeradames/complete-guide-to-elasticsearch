@@ -165,6 +165,7 @@
 - [Adding analyzers to existing indices](#adding-analyzers-to-existing-indices)
   - [Open & closed indices](#open--closed-indices)
   - [Dynamic and static settings](#dynamic-and-static-settings)
+- [Updating analyzers](#updating-analyzers)
 
 # Introduction to analysis
 
@@ -3269,7 +3270,7 @@ POST _analyze
 
 ```JSON
 # asciifolding converts special characters into ascii equivalent
-PUT analyer_test
+PUT analyzer_test
 {
   "settings": {
     "analysis": {
@@ -3287,7 +3288,7 @@ PUT analyer_test
 }
 
 # use the custom analyzer
-POST analyer_test/_analyze
+POST analyzer_test/_analyze
 {
   "analyzer": "my_custom_analyzer", 
   "text": "I&apos;m in a <em>good</em> mood&nbsp;and I <strong>love</love> acai!"
@@ -3346,7 +3347,7 @@ POST analyer_test/_analyze
 ## configure part of an analyzer example
 
 ```JSON
-PUT analyer_test2
+PUT analyzer_test2
 {
   "settings": {
     "analysis": {
@@ -3422,4 +3423,44 @@ Having to close and open the index is not specific to analyzers, but more precis
 - Alternatively reindex documents into a new index
   - Create the new index with the updated settings
   - Use an index alias for the transition
-  - 
+
+# Updating analyzers
+
+- Analyzers can be updated
+- Pay attention to existing documents
+  - They were analyzed using the old version of the analyzer
+  - Reindex these documents to avoid headaches
+- Try to get analyzers right before indexing documents
+  - Not always possbile, in which case you know what to do
+
+
+![updating-analyzer](pictures/mapping-and-analysis/updating-analyzers.png)
+
+```JSON
+POST analyzer_test/_close
+
+PUT analyzer_test/_settings
+{
+  "analysis": {
+    "analyzer": {
+      "my_custom_analyzer": {
+        "type": "custom",
+        "tokenizer": "standard",
+        "char_filter": ["html_strip"],
+        "filter": ["lowercase", "asciifolding"]
+      }
+    }
+  }
+}
+
+POST analyzer_test/_open
+
+# check that the update is there
+GET analyzer_test/_settings
+
+# reindex all docs
+#due to updating analyzer now after update will use the update one
+# before update are still using the old analyzer
+# reindex to keep have all previous doc use the same analyzer
+POST analyzer_test/_update_by_query?conflicts=proceed
+```
