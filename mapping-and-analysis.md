@@ -159,6 +159,9 @@
   - [How to use analyzer in field mapping](#how-to-use-analyzer-in-field-mapping)
   - [Configuring built-in anaylzers](#configuring-built-in-anaylzers)
     - [Using custom config](#using-custom-config)
+- [Creating custom analyzers](#creating-custom-analyzers)
+  - [Creating custom analyzer](#creating-custom-analyzer)
+  - [configure part of an analyzer example](#configure-part-of-an-analyzer-example)
 
 # Introduction to analysis
 
@@ -3106,3 +3109,262 @@ POST products/_doc
 ```
 
 `["peter's", "cute", "looking", "dog"]`
+
+# Creating custom analyzers
+
+```JSON
+#standard
+POST _analyze
+{
+  "analyzer": "standard",
+  "text": "I&apos;m in a <em>good</em> mood&nbsp;and I <strong>love</love> acai!"
+}
+
+#strip html
+POST _analyze
+{
+  "char_filter": ["html_strip"],
+  "text": "I&apos;m in a <em>good</em> mood&nbsp;and I <strong>love</love> acai!"
+}
+```
+
+```JSON
+# standard analyzer results
+{
+  "tokens" : [
+    {
+      "token" : "i",
+      "start_offset" : 0,
+      "end_offset" : 1,
+      "type" : "<ALPHANUM>",
+      "position" : 0
+    },
+    {
+      "token" : "apos",
+      "start_offset" : 2,
+      "end_offset" : 6,
+      "type" : "<ALPHANUM>",
+      "position" : 1
+    },
+    {
+      "token" : "m",
+      "start_offset" : 7,
+      "end_offset" : 8,
+      "type" : "<ALPHANUM>",
+      "position" : 2
+    },
+    {
+      "token" : "in",
+      "start_offset" : 9,
+      "end_offset" : 11,
+      "type" : "<ALPHANUM>",
+      "position" : 3
+    },
+    {
+      "token" : "a",
+      "start_offset" : 12,
+      "end_offset" : 13,
+      "type" : "<ALPHANUM>",
+      "position" : 4
+    },
+    {
+      "token" : "em",
+      "start_offset" : 15,
+      "end_offset" : 17,
+      "type" : "<ALPHANUM>",
+      "position" : 5
+    },
+    {
+      "token" : "good",
+      "start_offset" : 18,
+      "end_offset" : 22,
+      "type" : "<ALPHANUM>",
+      "position" : 6
+    },
+    {
+      "token" : "em",
+      "start_offset" : 24,
+      "end_offset" : 26,
+      "type" : "<ALPHANUM>",
+      "position" : 7
+    },
+    {
+      "token" : "mood",
+      "start_offset" : 28,
+      "end_offset" : 32,
+      "type" : "<ALPHANUM>",
+      "position" : 8
+    },
+    {
+      "token" : "nbsp",
+      "start_offset" : 33,
+      "end_offset" : 37,
+      "type" : "<ALPHANUM>",
+      "position" : 9
+    },
+    {
+      "token" : "and",
+      "start_offset" : 38,
+      "end_offset" : 41,
+      "type" : "<ALPHANUM>",
+      "position" : 10
+    },
+    {
+      "token" : "i",
+      "start_offset" : 42,
+      "end_offset" : 43,
+      "type" : "<ALPHANUM>",
+      "position" : 11
+    },
+    {
+      "token" : "strong",
+      "start_offset" : 45,
+      "end_offset" : 51,
+      "type" : "<ALPHANUM>",
+      "position" : 12
+    },
+    {
+      "token" : "love",
+      "start_offset" : 52,
+      "end_offset" : 56,
+      "type" : "<ALPHANUM>",
+      "position" : 13
+    },
+    {
+      "token" : "love",
+      "start_offset" : 58,
+      "end_offset" : 62,
+      "type" : "<ALPHANUM>",
+      "position" : 14
+    },
+    {
+      "token" : "acai",
+      "start_offset" : 64,
+      "end_offset" : 68,
+      "type" : "<ALPHANUM>",
+      "position" : 15
+    }
+  ]
+}
+
+# striping html result
+{
+  "tokens" : [
+    {
+      "token" : """I'm in a good mood and I love
+ acai!""",
+      "start_offset" : 0,
+      "end_offset" : 69,
+      "type" : "word",
+      "position" : 0
+    }
+  ]
+}
+```
+
+## Creating custom analyzer
+
+```JSON
+# asciifolding converts special characters into ascii equivalent
+PUT analyer_test
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "my_custom_analyzer": {
+          "type": "custom",
+          "char_filter": ["html_strip"],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase", "stop", "asciifolding"] 
+        }
+      }
+    }
+  }
+}
+
+# use the custom analyzer
+POST analyer_test/_analyze
+{
+  "analyzer": "my_custom_analyzer", 
+  "text": "I&apos;m in a <em>good</em> mood&nbsp;and I <strong>love</love> acai!"
+}
+```
+
+```JSON
+{
+  "tokens" : [
+    {
+      "token" : "i'm",
+      "start_offset" : 0,
+      "end_offset" : 8,
+      "type" : "<ALPHANUM>",
+      "position" : 0
+    },
+    {
+      "token" : "good",
+      "start_offset" : 18,
+      "end_offset" : 27,
+      "type" : "<ALPHANUM>",
+      "position" : 3
+    },
+    {
+      "token" : "mood",
+      "start_offset" : 28,
+      "end_offset" : 32,
+      "type" : "<ALPHANUM>",
+      "position" : 4
+    },
+    {
+      "token" : "i",
+      "start_offset" : 42,
+      "end_offset" : 43,
+      "type" : "<ALPHANUM>",
+      "position" : 6
+    },
+    {
+      "token" : "love",
+      "start_offset" : 52,
+      "end_offset" : 56,
+      "type" : "<ALPHANUM>",
+      "position" : 7
+    },
+    {
+      "token" : "acai",
+      "start_offset" : 64,
+      "end_offset" : 68,
+      "type" : "<ALPHANUM>",
+      "position" : 8
+    }
+  ]
+}
+```
+
+## configure part of an analyzer example
+
+```JSON
+PUT analyer_test2
+{
+  "settings": {
+    "analysis": {
+      "filter": {
+        "danish_stop": {
+          "type": "stop",
+          "stopwords": "_danish_"
+        }
+      }, 
+      "char_filter": {}, 
+      "tokenizer": {}, 
+      "analyzer": {
+        "my_custom_analyzer": {
+          "type": "custom",
+          "char_filter": ["html_strip"],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase", "danish_stop", "asciifolding"] 
+        }
+      }
+    }
+  }
+}
+```
