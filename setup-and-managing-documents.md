@@ -1258,6 +1258,7 @@ Perform **index, create, update, and delete** on many documents with a single qu
 the first line defines the action and some metadata, while the second line defines the source document.
 
 ## index vs update
+
 The "create" action will fail if the document already exists, which is not the case for the "index" action. If you use the "index" action, the document will be added if it doesn't already exist; otherwise it will be replaced.
 
 ### The Bulk API expects data formatted using the NDJSON specification
@@ -1424,3 +1425,48 @@ POST products/_bulk
 ## Importing data with cURL
 
 cURL is the most popular command line tool for sending HTTP requests. Already installed in macOS.
+
+- We will use the cURL HTTP client in this lecture
+  - This is the most popular command line tool for sending HTTP requests
+  - It should already be installed on macOS and Linux
+  - It might already be installed on windows
+- You are welcome to use any other HTTP client
+- Before proceeding, you need import data
+
+Final solution
+
+`curl -k -H "Content-Type: application/x-ndjson" -XPOST <https://localhost:9200/products/_bulk> --data-binary "@products-bulk.json" -u <your ID>:<your password>`
+
+Break Down
+
+`curl -H "Content-Type: application/x-ndjson" -xPOST <http://localhost:9200/products/_bulk> --data-binary "@products-bulk.json"`
+
+curl: (5) Could not resolve proxy: POST
+
+Solution: -x should be replaced by -X.
+
+[Source 📖](https://stackoverflow.com/a/51631293/3044126)
+
+`curl -H "Content-Type: application/x-ndjson" -XPOST <http://localhost:9200/products/_bulk> --data-binary "@products-bulk.json"`
+
+curl: (52) Empty reply from server
+
+Solution: This can happen if curl is asked to do plain HTTP on a server that does HTTPS.
+
+[Source 📖](https://stackoverflow.com/a/42837622/3044126)
+
+`curl -H "Content-Type: application/x-ndjson" -XPOST <https://localhost:9200/products/_bulk> --data-binary "@products-bulk.json"`
+
+curl: (60) SSL certificate problem: self signed certificate in certificate chain
+
+Solution: you can suppress certificate errors in curl with -k
+
+[suppress certificate errors Source 📖](https://stackoverflow.com/a/22170951/3044126)
+
+`curl -k -H "Content-Type: application/x-ndjson" -XPOST <https://localhost:9200/products/_bulk> --data-binary "@products-bulk.json"`
+
+{"error":{"root_cause":[{"type":"security_exception","reason":"missing authentication credentials for REST request [/products/_bulk]","header":{"WWW-Authenticate":["Basic realm=\"security\" charset=\"UTF-8\"","Bearer realm=\"security\"","ApiKey"]}}],"type":"security_exception","reason":"missing authentication credentials for REST request [/products/_bulk]","header":{"WWW-Authenticate":["Basic realm=\"security\" charset=\"UTF-8\"","Bearer realm=\"security\"","ApiKey"]}},"status":401}%
+
+Solution: sign in by using -u username:password
+
+[signing with curl Source 📖](https://www.udemy.com/course/elasticsearch-complete-guide/learn/lecture/16288174#:~:text=signing%20with%20curl%20Source%C2%A0%F0%9F%93%96)
