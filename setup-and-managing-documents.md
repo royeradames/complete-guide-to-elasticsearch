@@ -38,6 +38,13 @@
     - [If we need data analysis](#if-we-need-data-analysis)
     - [If we are concern about growing pains](#if-we-are-concern-about-growing-pains)
 - [Installation](#installation)
+  - [Windows](#windows)
+  - [Elasticsearch](#elasticsearch)
+    - [in the elasticsearch unzip folder open](#in-the-elasticsearch-unzip-folder-open)
+    - [Resetting the elastic user's password](#resetting-the-elastic-users-password)
+    - [Generate a new Kibana enrollment token](#generate-a-new-kibana-enrollment-token)
+  - [Kebana](#kebana)
+  - [Run both elasticsearch and kibana witht he same installation script](#run-both-elasticsearch-and-kibana-witht-he-same-installation-script)
   - [Elastic Cloud](#elastic-cloud)
 - [Elastisearch directory](#elastisearch-directory)
   - [$ES_HOME](#es_home)
@@ -394,6 +401,37 @@ Ideally, elasticsearch would be readonly
 [https://www.elastic.co/downloads/elasticsearch](https://www.elastic.co/downloads/elasticsearch)
 ![options](pictures/installation/options.png)
 
+## Windows
+
+Know bug: windows built in unzip has error with a kibana file that has a path that is too long
+Solution: use 7-zip to unzip the kabana
+
+## Elasticsearch
+
+### in the elasticsearch unzip folder open
+
+`bin/elasticsearch.bat`
+Wait for installation to finish
+
+It will create a super user with id and password
+ save them and enrollment token will be created.
+
+### Resetting the elastic user's password
+
+`bin/elasticsearch-reset-password.bat -u elastic`
+
+### Generate a new Kibana enrollment token
+
+`bin/elasticsearch-create-enrollment-token.bat -s kibana`
+
+## Kebana
+
+In the kebana unzip file run
+`bin/kibana.bat`
+
+## Run both elasticsearch and kibana witht he same installation script
+
+`elasticsearch/bin/elasticsearch.bat` and `kibana/bin/kibana.bat`
 ## Elastic Cloud
 
 [https://www.elastic.co/](https://www.elastic.co/)
